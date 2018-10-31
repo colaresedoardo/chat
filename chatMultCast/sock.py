@@ -1,13 +1,14 @@
 from threading import Thread
 import socket
 import struct
+
 import base64
-import hashlib
-from Crypto import Random
 from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto import Random
 class Sock(Thread):
     def __init__(self,ip, porta):
-        self.criptografia = CriptografiaAES('limao')
+        self.criptografia = CriptografiaAES(b'limao')
         Thread.__init__(self)
         porta = int(porta)
 
@@ -35,18 +36,28 @@ class Sock(Thread):
     def receber(self):
 
         self.data, self.address = self.sock.recvfrom(1024)
-        print("dados")
-        self.data = self.criptografia.decrypt(self.data)
-
-        print( self.data)
+        print("dados fazendo o encode")
+        dataCifrado = self.data
+        print(dataCifrado)
         print("Dados recebidos %s do %s " % (self.address))
+        self.data = self.criptografia.decrypt(dataCifrado, False)
+
+
     def enviar(self,msg):
 
+        #self.msg = msg.encode()
         self.msg = msg.encode()
+        print("show the message")
+        print(self.msg)
+        msgCifrada= self.criptografia.encrypt(self.msg, False)
+        print("Encript data")
 
-        self.msg= self.criptografia.encrypt(self.msg)
-        self.sock.sendto(self.msg, self.multicast_group)
-        #self.sock.sendto(msg, self.address)
+
+        print(msgCifrada)
+
+
+        self.sock.sendto(msgCifrada, self.multicast_group)
+
 
     def sair(self):
         #self.sock.shutdown(socket.SHUT_WR)
@@ -59,36 +70,47 @@ class CriptografiaAES():
     def __init__(self,key):
         self.bs =16
         self.pad = lambda s: s + (self.bs - len(s) % self.bs) * chr(self.bs - len(s) % self.bs)
-        self.key = hashlib.sha256(key.encode()).digest()
-    def encrypt(self, raw):
-        raw = self._pad(raw)
-        print("pritando o raw")
-        print(raw)
-        iv = Random.new().read(AES.block_size)
-        cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        base64.b64encode(iv + cipher.encrypt(raw))
-       # return base64.b64encode(iv+cipher.encrypt(raw))
 
-    def decrypt(self,enc):
-        enc = base64.b64encode(enc)
+        self.key =  SHA256.new(key).digest()
+    def encrypt(self, texto, encode=True):
 
-        iv = enc[:AES.block_size]
-        print(iv)
-        cipher = AES.new(self.key,AES.MODE_CBC, iv)
-        #print(cipher.decrypt(enc[:AES.block_size:]))
+        key = SHA256.new(self.key).digest()  # use SHA-256 over our key to get a proper-sized AES key
+        IV = Random.new().read(AES.block_size)  # generate IV
+        encryptor = AES.new(key, AES.MODE_CBC, IV)
+        padding = AES.block_size - len(texto) % AES.block_size  # calculate needed padding
+        texto += bytes([padding]) * padding  # Python 2.x: source += chr(padding) * padding
+        data = IV + encryptor.encrypt(texto)  # store the IV at the beginning and encrypt
+        print("mostrando dados")
+        print(data)
+        print("mostrando base65")
+        print(base64.b64encode(data).decode("utf-8") if encode else data)
+        return base64.b64encode(data).decode("utf-8") if encode else data
 
-        return self._unpad(cipher.decrypt(enc[AES.block_size:]))
+    def decrypt(self,texto, decode=True):
+        print("mosntrando a entrada")
+        print(texto)
+        if decode:
+            source = base64.b64decode(texto.encode("utf-8"))
+        key = SHA256.new(self.key).digest()  # use SHA-256 over our key to get a proper-sized AES key
+        IV = texto[:AES.block_size]  # extract the IV from the beginning
+        decryptor = AES.new(key, AES.MODE_CBC, IV)
+        data = decryptor.decrypt(texto[AES.block_size:])  # decrypt
+        print("descriptando")
+        print(data)
+        padding = data[-1]  # pick the padding value from the end; Python 2.x: ord(data[-1])
+        padding = data[-1]  # pick the padding value from the end; Python 2.x: ord(data[-1])
+        print("DATA PADDING")
+        print(data[-padding:])
+        print("Padding calculado")
+        print(bytes([padding]) * padding)
+        print("bytes from bytes")
+        print(bytes(padding))
 
-    def _pad(self,s):
+        if data[-padding:] != bytes([padding]) * padding:  # Python 2.x: chr(padding) * padding
+            raise ValueError("Invalid padding...")
+        return data[:-padding]  # remove the padding
 
-       # print( self.bs - len(s) % self.bs )
-       #3 return (s + b"\0"*(self.bs - len(s) % self.bs) * (self.bs - len(s) % self.bs))
-        print(s)
-        print("tamanho do bloco %s, tamanho da msg %s "%(AES.block_size,len(s)))
-        return b"\0"+s +  (AES.block_size - (len(s) % AES.block_size)*chr(AES.block_size - len(s) % AES.block_size))
-    @staticmethod
-    def _unpad(s):
-        return s[:-ord(s[len(s)-1:])]
+
 
 
 

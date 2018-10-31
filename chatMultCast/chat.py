@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+
 from tkinter import *
 from sock import Sock
 import sys
@@ -105,7 +105,7 @@ class InterfaceGrafica(Frame,Thread):
         self.ip = self.entradaip.get()
         self.porta = int(self.entradaporta.get())
         self.sock = Sock(self.ip , self.porta)
-        self.sock.enviar("entrou na sala hahaahahaah")
+        self.sock.enviar("entrou na sala")
         self.sock.start()
         self.t1 = Thread(name='Atualizar lista', target=self.atualizarLista)
         self.t1.start()
@@ -124,14 +124,14 @@ class InterfaceGrafica(Frame,Thread):
             data =  self.sock.data
             print("recebendo dados")
             print(data)
-            data = data.decode("utf-8")
+            data = data.decode()
 
             self.lista.insert(0, "%s : %s " % (self.entradanome.get(),data))
             #print("É vdd este bilhete")
 
 
     def enviarMsg(self):
-        msg = self.entradamsg.get()
+        msg = "diz "+self.entradamsg.get()
         if msg != "":
             self.sock.enviar(msg)
 
